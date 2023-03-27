@@ -8,6 +8,8 @@ from datetime import timedelta
 
 formatTypes = ['PCM_16', 'PCM_24', 'PCM_32', 'FLOAT', 'DOUBLE']
 
+offsetAndSafeSpace = 100
+
 
 def to_time(time_str: str):
     h = 0
@@ -228,6 +230,8 @@ class MyWidget(QtWidgets.QWidget):
     def do_convert(self):
         self.buttonConvert.setEnabled(False)
 
+        out_format = self.format_select.currentText()
+
         [res, h, m, s, f] = to_time(self.edit_start.text())
         if not res:
             msg_box = QtWidgets.QMessageBox()
@@ -252,23 +256,42 @@ class MyWidget(QtWidgets.QWidget):
                 out_selected.append(False)
 
         outfiles = []
+        base_names = []
         for i in range(self.numChannels):
             if not out_selected[i]:
                 outfiles.append(None)
                 continue
-            filename = self.channelNames[i].text()
-            if filename != "":
-                filename = 'ch' + str(i + 1) + "_" + filename + ".wav"
+            name = self.channelNames[i].text()
+            if name != "":
+                name = 'ch' + str(i + 1) + "_" + name
             else:
-                filename = 'ch' + str(i + 1) + ".wav"
-            filename = os.path.join(self.outdir, filename)
-            outfiles.append(sf.SoundFile(filename, 'w', self.sampleRate, 1, self.format_select.currentText()))
+                name = 'ch' + str(i + 1)
+            name = os.path.join(self.outdir, name)
+            filename = name + ".wav"
+            base_names.append(name)
+            outfiles.append(sf.SoundFile(filename, 'w', self.sampleRate, 1, out_format))
 
         self.progressbar.setValue(0)
         QtWidgets.QApplication.processEvents()
 
         samples_done = 0
         step_len = 10000
+
+        bytes_per_sample = 3 # PCM_24 as standard
+        if out_format == "PCM_16":
+            bytes_per_sample = 2
+        if out_format == "PCM_32":
+            bytes_per_sample = 4
+        if out_format == "FLOAT":
+            bytes_per_sample = 4
+        if out_format == "DOUBLE":
+            bytes_per_sample = 8
+
+        single_file_frames = 4*1024*1024*1024 // bytes_per_sample
+        single_file_blocks = single_file_frames // step_len
+
+        file_block_counter = 0
+        file_counter = 0
 
         done_done = False
         for infilename in self.infiles:
@@ -278,6 +301,7 @@ class MyWidget(QtWidgets.QWidget):
                 infile.close()
                 continue
             done = False
+
             while not done:
                 if (start_frame - samples_done) > 0:
                     infile.seek(start_frame - samples_done)
@@ -287,6 +311,17 @@ class MyWidget(QtWidgets.QWidget):
                     read_len = end_frame - samples_done
                     done_done = True
                 data = infile.read(read_len)
+
+                if file_block_counter >= single_file_blocks:
+                    file_block_counter = 0
+                    file_counter += 1
+                    for i in range(self.numChannels):
+                        if out_selected[i]:
+                            outfiles[i].close()
+                            filename = base_names[i] + "-" + str(file_counter) + ".wav"
+                            outfiles[i] = sf.SoundFile(filename, 'w', self.sampleRate, 1, out_format)
+                file_block_counter += 1
+
                 if self.numChannels == 1:
                     if out_selected[0]:
                         outfiles[0].write(data)
