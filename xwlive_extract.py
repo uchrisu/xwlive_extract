@@ -87,6 +87,17 @@ class MyWidget(QtWidgets.QWidget):
             QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum))
         self.main_layout.addLayout(self.layout_between)
 
+        self.layout_select = QtWidgets.QHBoxLayout()
+        self.button_select_all = QtWidgets.QPushButton("Select All")
+        self.button_select_all.clicked.connect(self.select_all)
+        self.layout_select.addWidget(self.button_select_all)
+        self.button_select_none = QtWidgets.QPushButton("Select None")
+        self.button_select_none.clicked.connect(self.select_none)
+        self.layout_select.addWidget(self.button_select_none)
+        self.layout_select.addSpacerItem(
+            QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum))
+        self.main_layout.addLayout(self.layout_select)
+
         self.scrolllayout = QtWidgets.QVBoxLayout()
         self.channelLabels = []
         self.channelNames = []
@@ -218,6 +229,14 @@ class MyWidget(QtWidgets.QWidget):
         self.edit_start.setText("00:00:00")
 
         self.infiles = file_list
+
+    def select_all(self):
+        for i in range(self.maxchannels):
+            self.checkOuts[i].setChecked(True)
+
+    def select_none(self):
+        for i in range(self.maxchannels):
+            self.checkOuts[i].setChecked(False)
 
     def select_output(self):
         self.outdir = QtWidgets.QFileDialog.getExistingDirectory(self, "Open Output Directory",
