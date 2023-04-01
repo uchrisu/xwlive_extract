@@ -118,6 +118,7 @@ class MyWidget(QtWidgets.QWidget):
             self.checkLinks.append(QtWidgets.QCheckBox())
             self.checkLinks[i].setChecked(False)
             self.checkLinks[i].setText("Link")
+            self.checkLinks[i].stateChanged.connect(self.update_ui_channels)
             self.horLayouts[i].addWidget(self.checkLinks[i])
             self.channelLabelNames.append(QtWidgets.QLabel("Name: "))
             self.channelLabelNames[i].setMinimumWidth(60)
@@ -131,6 +132,7 @@ class MyWidget(QtWidgets.QWidget):
             self.channelLines[i].setFrameShape(QtWidgets.QFrame.Shape.HLine)
             self.channelLines[i].setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
             self.scrolllayout.addWidget(self.channelLines[i])
+        self.channelLines[self.maxchannels - 1].setVisible(False)
         self.scrollwidget = QtWidgets.QWidget()
         self.scrollwidget.setLayout(self.scrolllayout)
         self.scrollchannels = QtWidgets.QScrollArea()
@@ -241,6 +243,8 @@ class MyWidget(QtWidgets.QWidget):
             self.channelLabelNames[i].setVisible(False)
             self.checkLinks[i].setVisible(False)
 
+        self.channelLines[self.numChannels - 1].setVisible(False)
+
         end_f = numSamples % self.sampleRate
         end_s = (numSamples // self.sampleRate) % 60
         end_m = (numSamples // (self.sampleRate * 60)) % 60
@@ -266,6 +270,15 @@ class MyWidget(QtWidgets.QWidget):
                                                                  | QtWidgets.QFileDialog.DontResolveSymlinks)
         if self.outdir != "":
             self.label_outputdir.setText(self.outdir)
+
+    def update_ui_channels(self):
+        for i in range(1, self.maxchannels):
+            if self.checkLinks[i].isChecked():
+                self.checkOuts[i].setEnabled(False)
+                self.channelNames[i].setEnabled(False)
+            else:
+                self.checkOuts[i].setEnabled(True)
+                self.channelNames[i].setEnabled(True)
 
     def do_convert(self):
         self.buttonConvert.setEnabled(False)

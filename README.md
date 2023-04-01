@@ -9,10 +9,11 @@ How it works:
 - Wait until the progress bar reaches 100%. You're done.
 
 Furthermore you can
-- give the channels names. Then the filenames will contain these names.
+- give the channels names. Then the file names will contain these names.
 - select which channel you want to have exported. By default all channels will be exported.
 - limit the time range to export.
 - choose the export format.
+- links output channels. "Linked" channels will be included in the file from the channel above. You can link an arbitrary number of channels to one file.
 
 Requirements:
 - Pyside6
@@ -33,7 +34,7 @@ Export formats are:
 
 License
 -------
-Caa is licensed under the terms
+XWLive Extractor is licensed under the terms
 of the GNU General Public License, version 3. A copy of the license
 can be found in the file LICENSE which can be found in the source
 archive. You can read it here: http://www.gnu.org/licenses/gpl-3.0.html
