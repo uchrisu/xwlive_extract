@@ -103,19 +103,34 @@ class MyWidget(QtWidgets.QWidget):
         self.channelNames = []
         self.horLayouts = []
         self.checkOuts = []
+        self.checkLinks = []
+        self.channelLabelNames = []
+        self.channelLines = []
         for i in range(self.maxchannels):
             self.horLayouts.append(QtWidgets.QHBoxLayout())
+            self.channelLabels.append(QtWidgets.QLabel("Ch. " + str(i + 1) + " "))
+            self.channelLabels[i].setMinimumWidth(50)
+            self.horLayouts[i].addWidget(self.channelLabels[i])
             self.checkOuts.append(QtWidgets.QCheckBox())
             self.checkOuts[i].setChecked(True)
+            self.checkOuts[i].setText("Export")
             self.horLayouts[i].addWidget(self.checkOuts[i])
-            self.channelLabels.append(QtWidgets.QLabel("Name Ch. " + str(i + 1) + ":"))
-            self.channelLabels[i].setMinimumWidth(100)
-            self.horLayouts[i].addWidget(self.channelLabels[i])
+            self.checkLinks.append(QtWidgets.QCheckBox())
+            self.checkLinks[i].setChecked(False)
+            self.checkLinks[i].setText("Link")
+            self.horLayouts[i].addWidget(self.checkLinks[i])
+            self.channelLabelNames.append(QtWidgets.QLabel("Name: "))
+            self.channelLabelNames[i].setMinimumWidth(60)
+            self.horLayouts[i].addWidget(self.channelLabelNames[i])
             self.channelNames.append(QtWidgets.QLineEdit())
             self.horLayouts[i].addWidget(self.channelNames[i])
             self.horLayouts[i].addSpacerItem(
                 QtWidgets.QSpacerItem(40, 0, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum))
             self.scrolllayout.addLayout(self.horLayouts[i])
+            self.channelLines.append(QtWidgets.QFrame())
+            self.channelLines[i].setFrameShape(QtWidgets.QFrame.Shape.HLine)
+            self.channelLines[i].setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
+            self.scrolllayout.addWidget(self.channelLines[i])
         self.scrollwidget = QtWidgets.QWidget()
         self.scrollwidget.setLayout(self.scrolllayout)
         self.scrollchannels = QtWidgets.QScrollArea()
@@ -214,11 +229,17 @@ class MyWidget(QtWidgets.QWidget):
             self.channelNames[i].setVisible(True)
             self.channelLabels[i].setVisible(True)
             self.checkOuts[i].setVisible(True)
+            self.channelLines[i].setVisible(True)
+            self.channelLabelNames[i].setVisible(True)
+            self.checkLinks[i].setVisible(True)
 
         for i in range(self.numChannels, self.maxchannels):
             self.channelNames[i].setVisible(False)
             self.channelLabels[i].setVisible(False)
             self.checkOuts[i].setVisible(False)
+            self.channelLines[i].setVisible(False)
+            self.channelLabelNames[i].setVisible(False)
+            self.checkLinks[i].setVisible(False)
 
         end_f = numSamples % self.sampleRate
         end_s = (numSamples // self.sampleRate) % 60
@@ -274,21 +295,36 @@ class MyWidget(QtWidgets.QWidget):
             else:
                 out_selected.append(False)
 
+        comb_channels = []
+        ch_start = 0
+        for i in range(self.numChannels - 1):
+            if not self.checkLinks[i + 1].isChecked():
+                if self.checkOuts[ch_start].isChecked():
+                    comb_channels.append([ch_start, i])
+                ch_start = i + 1
+        if self.checkOuts[ch_start].isChecked():
+            comb_channels.append([ch_start, self.numChannels - 1])
+
+        print("Output channel ranges: ", comb_channels)
+
+        num_outs = len(comb_channels)
+
         outfiles = []
         base_names = []
-        for i in range(self.numChannels):
-            if not out_selected[i]:
-                outfiles.append(None)
-                continue
-            name = self.channelNames[i].text()
+        for i in range(num_outs):
+            ch_start = comb_channels[i][0]
+            ch_end = comb_channels[i][1]
+            name = self.channelNames[ch_start].text()
             if name != "":
-                name = 'ch' + str(i + 1) + "_" + name
+                name = "_" + name
+            if ch_start == ch_end:
+                name = 'ch' + str(ch_start + 1) + name
             else:
-                name = 'ch' + str(i + 1)
+                name = 'ch' + str(ch_start + 1) + "-" + str(ch_end + 1) + name
             name = os.path.join(self.outdir, name)
             filename = name + ".wav"
             base_names.append(name)
-            outfiles.append(sf.SoundFile(filename, 'w', self.sampleRate, 1, out_format))
+            outfiles.append(sf.SoundFile(filename, 'w', self.sampleRate, ch_end - ch_start + 1, out_format))
 
         self.progressbar.setValue(0)
         QtWidgets.QApplication.processEvents()
@@ -309,8 +345,13 @@ class MyWidget(QtWidgets.QWidget):
         single_file_frames = 4*1024*1024*1024 // bytes_per_sample
         single_file_blocks = single_file_frames // step_len
 
-        file_block_counter = 0
-        file_counter = 0
+        comb_file_blocks = []
+        file_block_counter = []
+        file_counter = []
+        for i in range(num_outs):
+            comb_file_blocks.append(single_file_blocks // (comb_channels[i][1] - comb_channels[i][0] + 1))
+            file_block_counter.append(0)
+            file_counter.append(0)
 
         done_done = False
         for infilename in self.infiles:
@@ -331,23 +372,22 @@ class MyWidget(QtWidgets.QWidget):
                     done_done = True
                 data = infile.read(read_len)
 
-                if file_block_counter >= single_file_blocks:
-                    file_block_counter = 0
-                    file_counter += 1
-                    for i in range(self.numChannels):
-                        if out_selected[i]:
-                            outfiles[i].close()
-                            filename = base_names[i] + "-" + str(file_counter) + ".wav"
-                            outfiles[i] = sf.SoundFile(filename, 'w', self.sampleRate, 1, out_format)
-                file_block_counter += 1
+                for i in range(num_outs):
+                    if file_block_counter[i] >= comb_file_blocks[i]:
+                        file_block_counter[i] = 0
+                        file_counter[i] += 1
+                        outfiles[i].close()
+                        filename = base_names[i] + "-" + str(file_counter[i]) + ".wav"
+                        outfiles[i] = sf.SoundFile(filename, 'w', self.sampleRate,
+                                                   comb_channels[i][1] - comb_channels[i][0] + 1, out_format)
+                    file_block_counter[i] += 1
 
                 if self.numChannels == 1:
                     if out_selected[0]:
                         outfiles[0].write(data)
                 else:
-                    for i in range(self.numChannels):
-                        if out_selected[i]:
-                            outfiles[i].write(data[:, i])
+                    for i in range(num_outs):
+                        outfiles[i].write(data[:, comb_channels[i][0]:(comb_channels[i][1]+1)])
                 samples_done = samples_done + len(data)
                 if len(data) < step_len:
                     done = True
@@ -359,9 +399,8 @@ class MyWidget(QtWidgets.QWidget):
 
         self.progressbar.setValue(100)
 
-        for i in range(self.numChannels):
-            if out_selected[i]:
-                outfiles[i].close()
+        for i in range(num_outs):
+            outfiles[i].close()
 
         self.buttonConvert.setEnabled(True)
 
