@@ -68,6 +68,17 @@ def se_log_extract(bytecode: bytes):
     return [name, vals]
 
 
+def samples_to_time_string(samples, fs):
+    f = samples % fs
+    s = (samples // fs) % 60
+    m = (samples // (fs * 60)) % 60
+    h = samples // (fs * 60 * 60)
+    if f == 0:
+        return str(h) + f":{m:02d}" + f":{s:02d}"
+    else:
+        return str(h) + f":{m:02d}" + f":{s:02d}." + str(f)
+
+
 class MyWidget(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
@@ -96,15 +107,17 @@ class MyWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self.label_inputinfo)
 
         self.layout_between = QtWidgets.QHBoxLayout()
-        self.edit_start = QtWidgets.QLineEdit()
-        self.edit_start.setMaximumWidth(150)
-        self.edit_start.setText('00:00:00')
+        self.edit_start = QtWidgets.QComboBox()
+        self.edit_start.setEditable(True)
+        self.edit_start.setMinimumWidth(200)
+        self.edit_start.setCurrentText('00:00:00')
         self.layout_between.addWidget(self.edit_start)
         self.label_between1 = QtWidgets.QLabel(" - ")
         self.layout_between.addWidget(self.label_between1)
-        self.edit_end = QtWidgets.QLineEdit()
-        self.edit_end.setMaximumWidth(150)
-        self.edit_end.setText("00:00:00")
+        self.edit_end = QtWidgets.QComboBox()
+        self.edit_end.setEditable(True)
+        self.edit_end.setMinimumWidth(200)
+        self.edit_end.setCurrentText("00:00:00")
         self.layout_between.addWidget(self.edit_end)
         self.label_between2 = QtWidgets.QLabel("Format: hh:mm:ss.samples")
         self.layout_between.addWidget(self.label_between2)
@@ -265,14 +278,6 @@ class MyWidget(QtWidgets.QWidget):
 
         self.channelLines[self.numChannels - 1].setVisible(False)
 
-        end_f = numSamples % self.sampleRate
-        end_s = (numSamples // self.sampleRate) % 60
-        end_m = (numSamples // (self.sampleRate * 60)) % 60
-        end_h = numSamples // (self.sampleRate * 60 * 60)
-
-        self.edit_end.setText(str(end_h) + f":{end_m:02d}" + f":{end_s:02d}." + str(end_f))
-        self.edit_start.setText("00:00:00")
-
         self.infiles = file_list
 
         logfile_name = os.path.join(dirname, 'SE_LOG.BIN')
@@ -293,6 +298,24 @@ class MyWidget(QtWidgets.QWidget):
                            + str(self.sampleRate) + "Hz"
 
         self.label_inputinfo.setText(input_info_text)
+
+        self.edit_start.clear()
+        self.edit_end.clear()
+
+        self.edit_start.addItem("(Start) 0:00:00")
+        self.edit_end.addItem("(Start) 0:00:00")
+
+        i = 0
+        for marker in markers:
+            i += 1
+            self.edit_start.addItem('(Mk ' + str(i) + ') ' + samples_to_time_string(marker, self.sampleRate))
+            self.edit_end.addItem('(Mk ' + str(i) + ') ' + samples_to_time_string(marker, self.sampleRate))
+
+        self.edit_start.addItem('(End) ' + samples_to_time_string(numSamples, self.sampleRate))
+        self.edit_end.addItem('(End) ' + samples_to_time_string(numSamples, self.sampleRate))
+
+        self.edit_end.setCurrentText(samples_to_time_string(numSamples, self.sampleRate))
+        self.edit_start.setCurrentText("00:00:00")
 
     def select_all(self):
         for i in range(self.maxchannels):
@@ -324,19 +347,21 @@ class MyWidget(QtWidgets.QWidget):
 
         out_format = self.format_select.currentText()
 
-        [res, h, m, s, f] = to_time(self.edit_start.text())
+        [res, h, m, s, f] = to_time(self.edit_start.currentText().split(')')[-1])
         if not res:
             msg_box = QtWidgets.QMessageBox()
             msg_box.setText("Start/stop time not correct!")
             msg_box.exec()
+            self.buttonConvert.setEnabled(True)
             return
         start_frame = h * 60 * 60 * self.sampleRate + m * 60 * self.sampleRate + s * self.sampleRate + f
 
-        [res, h, m, s, f] = to_time(self.edit_end.text())
+        [res, h, m, s, f] = to_time(self.edit_end.currentText().split(')')[-1])
         if not res:
             msg_box = QtWidgets.QMessageBox()
             msg_box.setText("Start/stop time not correct!")
             msg_box.exec()
+            self.buttonConvert.setEnabled(True)
             return
         end_frame = h * 60 * 60 * self.sampleRate + m * 60 * self.sampleRate + s * self.sampleRate + f
 
