@@ -43,6 +43,31 @@ def to_time(time_str: str):
     return [res, h, m, s, f]
 
 
+def se_log_extract(bytecode: bytes):
+    name_bytes = bytecode[1552:1572]
+    split_pos = 0
+    while split_pos < 19:
+        if name_bytes[split_pos] == 0:
+            break
+        split_pos += 1
+    if split_pos == 0:
+        name = ''
+    else:
+        name_bytes = name_bytes[0:split_pos]
+        name = name_bytes.decode("utf-8")
+    position = 1052
+    vals = []
+    while position < 1552:
+        val = (bytecode[position]) + (bytecode[position + 1] << 8) \
+              + (bytecode[position + 2] << 16) + (bytecode[position + 3] << 24)
+        if val != 0:
+            vals.append(val)
+        else:
+            break
+        position += 4
+    return [name, vals]
+
+
 class MyWidget(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
@@ -222,11 +247,6 @@ class MyWidget(QtWidgets.QWidget):
         time_seconds = numSamples // sampleRate
         time_plusframes = numSamples % sampleRate
 
-        self.label_inputinfo.setText(str(self.numChannels) + " channels, "
-                                     + "{:0>8}".format(str(timedelta(seconds=time_seconds)))
-                                     + "(+" + str(time_plusframes) + " frames)" + " at "
-                                     + str(self.sampleRate) + "Hz")
-
         for i in range(self.numChannels):
             self.channelNames[i].setVisible(True)
             self.channelLabels[i].setVisible(True)
@@ -254,6 +274,25 @@ class MyWidget(QtWidgets.QWidget):
         self.edit_start.setText("00:00:00")
 
         self.infiles = file_list
+
+        logfile_name = os.path.join(dirname, 'SE_LOG.BIN')
+        name = ""
+        if os.path.isfile(logfile_name):
+            with open(logfile_name, mode="rb") as logfile:
+                [name, markers] = se_log_extract(logfile.read())
+                print(name)
+                print(markers)
+
+        input_info_text = ""
+        if "name" != "":
+            input_info_text = name + ": "
+
+        input_info_text += str(self.numChannels) + " channels, " \
+                           + "{:0>8}".format(str(timedelta(seconds=time_seconds))) \
+                           + "(+" + str(time_plusframes) + " frames)" + " at " \
+                           + str(self.sampleRate) + "Hz"
+
+        self.label_inputinfo.setText(input_info_text)
 
     def select_all(self):
         for i in range(self.maxchannels):
@@ -345,7 +384,7 @@ class MyWidget(QtWidgets.QWidget):
         samples_done = 0
         step_len = 10000
 
-        bytes_per_sample = 3 # PCM_24 as standard
+        bytes_per_sample = 3  # PCM_24 as standard
         if out_format == "PCM_16":
             bytes_per_sample = 2
         if out_format == "PCM_32":
@@ -355,7 +394,7 @@ class MyWidget(QtWidgets.QWidget):
         if out_format == "DOUBLE":
             bytes_per_sample = 8
 
-        single_file_frames = 4*1024*1024*1024 // bytes_per_sample
+        single_file_frames = 4 * 1024 * 1024 * 1024 // bytes_per_sample
         single_file_blocks = single_file_frames // step_len
 
         comb_file_blocks = []
@@ -400,7 +439,7 @@ class MyWidget(QtWidgets.QWidget):
                         outfiles[0].write(data)
                 else:
                     for i in range(num_outs):
-                        outfiles[i].write(data[:, comb_channels[i][0]:(comb_channels[i][1]+1)])
+                        outfiles[i].write(data[:, comb_channels[i][0]:(comb_channels[i][1] + 1)])
                 samples_done = samples_done + len(data)
                 if len(data) < step_len:
                     done = True
