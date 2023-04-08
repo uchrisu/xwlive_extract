@@ -44,6 +44,7 @@ def to_time(time_str: str):
 
 
 def se_log_extract(bytecode: bytes):
+    # Format of the file was figured out with the help of the code at https://github.com/pmaillot/X32-Behringer
     name_bytes = bytecode[1552:1572]
     split_pos = 0
     while split_pos < 19:
@@ -65,7 +66,16 @@ def se_log_extract(bytecode: bytes):
         else:
             break
         position += 4
-    return [name, vals]
+    time_code = (bytecode[0]) + (bytecode[1] << 8) + (bytecode[2] << 16) + (bytecode[3] << 24)
+    time_year = (time_code >> 25) + 1980
+    time_month = ((time_code & 0x1FFFFFF) >> 21)
+    time_day = ((time_code & 0x1FFFFF) >> 16)
+    time_hour = ((time_code & 0xFFFF) >> 11)
+    time_minute = ((time_code & 0x7FF) >> 5)
+    time_second = ((time_code & 0x1F) * 2)
+    time_str = f"{time_day:02d}.{time_month:02d}.{time_year} {time_hour:02d}:{time_minute:02d}:{time_second:02d}"
+
+    return [name, vals, time_str]
 
 
 def samples_to_time_string(samples, fs):
@@ -284,13 +294,14 @@ class MyWidget(QtWidgets.QWidget):
         name = ""
         if os.path.isfile(logfile_name):
             with open(logfile_name, mode="rb") as logfile:
-                [name, markers] = se_log_extract(logfile.read())
+                [name, markers, create_time] = se_log_extract(logfile.read())
                 print(name)
+                print(create_time)
                 print(markers)
 
-        input_info_text = ""
-        if "name" != "":
-            input_info_text = name + ": "
+        input_info_text = create_time + ":   "
+        if name != "":
+            input_info_text = name + " (" + create_time + "):   "
 
         input_info_text += str(self.numChannels) + " channels, " \
                            + "{:0>8}".format(str(timedelta(seconds=time_seconds))) \
