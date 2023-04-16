@@ -319,8 +319,8 @@ class MyWidget(QtWidgets.QWidget):
         i = 0
         for marker in markers:
             i += 1
-            self.edit_start.addItem('(Mk ' + str(i) + ') ' + samples_to_time_string(marker, self.sampleRate))
-            self.edit_end.addItem('(Mk ' + str(i) + ') ' + samples_to_time_string(marker, self.sampleRate))
+            self.edit_start.addItem('(M' + str(i) + ') ' + samples_to_time_string(marker, self.sampleRate))
+            self.edit_end.addItem('(M' + str(i) + ') ' + samples_to_time_string(marker, self.sampleRate))
 
         self.edit_start.addItem('(End) ' + samples_to_time_string(numSamples, self.sampleRate))
         self.edit_end.addItem('(End) ' + samples_to_time_string(numSamples, self.sampleRate))
